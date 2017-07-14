@@ -21,7 +21,7 @@ gorqlite should be considered alpha until more testers share their experiences. 
 * Support for several rqlite-specific operations:
   * `Leader()` and `Peers()` to examine the cluster.
   * `SetConsistencyLevel()` can be called at any time on a connection to change the consistency level for future operations.
-  * `Timing` can be referenced on a per-result basis to retrieve the timings information for executed operations as float64, per the rqlite API. 
+  * `Timing` can be referenced on a per-result basis to retrieve the timings information for executed operations as float64, per the rqlite API.
 * `Trace(io.Writer)`/`Trace(nil)` can be used to turn on/off debugging information on everything gorqlite does to a io.Writer of your choice.
 * No external dependencies. Uses only standard library functions.
 
@@ -62,14 +62,14 @@ conn.SetConsistencyLevel("strong")
 conn.SetTimeout(10)
 
 // simulate database/sql Prepare()
-statements := make ([]string,0)
-pattern := "INSERT INTO secret_agents(id, hero_name, abbrev) VALES (%d, '%s', '%3s')"
-statements = append(statements,fmt.Sprintf(pattern,125718,"Speed Gibson","Speed"))
-statements = append(statements,fmt.Sprintf(pattern,209166,"Clint Barlow","Clint"))
-statements = append(statements,fmt.Sprintf(pattern,44107,"Barney Dunlap","Barney"))
+var statements []string
+pStmt := NewPreparedStatement("INSERT INTO secret_agents(id, hero_name, abbrev) VALUES (%d %s %3s)")
+statements = append(statements, pStmt.Bind(125718, "Speed Gibson", "Speed"))
+statements = append(statements, pStmt.Bind(209166, "Clint Barlow", "Clint"))
+statements = append(statements, pStmt.Bind(44107, "Barney Dunlap", "Barney"))
 results, err := conn.Write(statements)
 
-// now we have an array of []WriteResult 
+// now we have an array of []WriteResult
 
 for n, v := range WriteResult {
 	fmt.Printf("for result %d, %d rows were affected\n",n,v.RowsAffected)
@@ -168,7 +168,7 @@ The chief reasons a proper database/sql driver is not possible are:
 
 * As a consequence, there is no rollback.
 
-* The statement parsing/preparation API is not exposed at the SQL layer by sqlite, and hence it's not exposed by rqlite.  What this means is that there's no way to prepare a statement (`"INSERT INTO superheroes (?,?)"`) and then later bind executions to it.  (In case you're wondering, yes, it would be possible for gorqlite to include a copy of sqlite3 and use its engine, but the sqlite C call to `sqlite3_prepare_v2()` will fail because a local sqlite3 won't know your DB's schemas and the `sqlite3_prepare_v2()` call validates the statement against the schema.  We could open the local sqlite .db file maintained by rqlite and validate against that, but there is no way to make a consistency guarantee between time of preparation and execution, especially since the user can mix DDL and DML in a single transaction).
+* Prepared statements can be made and used using the `PreparedStatement` type. Create a new PreparedStatement instance with `NewPreparedStatement` with the SQL query as a string argument with sprintf syntax. Do not surround strings in quotes, as the `Bind` call will add those for you. See above for the usage.
 
 * So we've turned off `Begin()`, `Rollback()`, and `Commit()`, and now we need to turn off `Prepare()`.
 
@@ -178,7 +178,7 @@ The chief reasons a proper database/sql driver is not possible are:
 
 In `database/sql`, `Open()` doesn't actually do anything.  You get a "connection" that doesn't connect until you `Ping()` or send actual work.  In gorqlite's case, it needs to connect to get cluster information, so this is done immediately and automatically open calling `Open()`.  By the time `Open()` is returned, gorqlite has full cluster info.
 
-Just like `database/sql` connections, a gorqlite connection is not threadsafe.  
+Just like `database/sql` connections, a gorqlite connection is not threadsafe.
 
 `Close()` will set a flag so if you try to use the connection afterwards, it will fail.  But otherwise, you can merrily let your connections be garbage-collected with no harm, because they're just configuration tracking bundles and everything to the rqlite cluster is stateless.  Indeed, the true reason that `Close()` exists is the author's feeling that if you open something, you should be able to close it.  So why not `GetConnection()` then instead of `Open()`?  Or `GetClusterConfigurationTrackingObject()`?  I don't know.  Fork me.
 
@@ -205,4 +205,3 @@ These can overridden using the environment variables:
 
 ## Pronunciation
 rqlite is supposed to be pronounced "ree qwell lite".  So you could pronounce gorqlite as either "go ree kwell lite" or "gork lite".  The Klingon in me prefers the latter.  Really, isn't rqlite just the kind of battle-hardened, lean and mean system Klingons would use?  **Qapla'!**
-
